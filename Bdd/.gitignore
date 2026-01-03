@@ -1,0 +1,11 @@
+
+*.bak
+*.backup
+
+
+*.mwb.bak
+*.mwb.beforefix
+
+
+.DS_Store
+Thumbs.db
