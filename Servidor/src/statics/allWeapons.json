@@ -1,0 +1,17 @@
+[
+    { 
+        "type": "Pistola",
+        "damage": 2,
+        "range": 10
+    },
+    { 
+        "type": "Pistola 2 jiija",
+        "damage": 3,
+        "range": 111
+    },
+    { 
+        "type": "Pistola 3 jiija",
+        "damage": 34,
+        "range": 1111
+    }
+]

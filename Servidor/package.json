@@ -1,0 +1,30 @@
+{
+  "name": "ubuntus_2025",
+  "version": "1.0.0",
+  "description": "Edit a file, create a new file, and clone from Bitbucket in under 2 minutes",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdriaLama/AA2Sistemas_2025_IgnacioErmisch_AdriaLama.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AdriaLama/AA2Sistemas_2025_IgnacioErmisch_AdriaLama/issues"
+  },
+  "homepage": "https://github.com/AdriaLama/AA2Sistemas_2025_IgnacioErmisch_AdriaLama#readme",
+  "dependencies": {
+    "express": "4.21.2",
+    "ip": "^2.0.1",
+    "morgan": "^1.10.1",
+    "mysql": "^2.18.1",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
