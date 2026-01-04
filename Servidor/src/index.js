@@ -43,3 +43,16 @@ server.listen(app.get("port"), () => {
     const url = "http://" + ip + ":" + port + "/";
     console.log("Servidor arrancado en la url: " + url);
 })
+
+io.on("connection", (socket) => {
+    console.log("Cliente conectado: " + socket.id);
+    
+    socket.on("message", (data) => {
+        console.log("Mensaje recibido del cliente:", data);
+        socket.emit("message", data);
+    });
+    
+    socket.on("disconnect", () => {
+        console.log("Cliente desconectado");
+    });
+});
