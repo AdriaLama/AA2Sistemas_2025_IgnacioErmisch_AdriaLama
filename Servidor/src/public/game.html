@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Columns Online - Lobby</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 { color: #333; text-align: center; }
+        h2 { color: #666; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        button:hover { background-color: #45a049; }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .room {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .room.available {
+            border-color: #4CAF50;
+            background-color: #f9fff9;
+            cursor: pointer;
+        }
+        
+        .room.full {
+            border-color: #ff9800;
+            background-color: #fff9f0;
+        }
+        
+        .room:hover.available {
+            background-color: #e8f5e8;
+        }
+        
+        .room-info { flex-grow: 1; }
+        .room-name { font-weight: bold; font-size: 18px; color: #333; }
+        .room-players { color: #666; margin-top: 5px; }
+        
+        .status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .status.waiting { background-color: #fff3cd; color: #856404; }
+        .status.playing { background-color: #d1ecf1; color: #0c5460; }
+        
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        #lobbySection, #gameSection {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Columns Online</h1>
+        
+        <!-- SECCIÓN DE LOGIN -->
+        <div id="loginSection">
+            <h2>Bienvenido</h2>
+            <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="20"/>
+            <button onclick="login()">Continuar</button>
+        </div>
+        
+        <!-- SECCIÓN DE LOBBY -->
+        <div id="lobbySection">
+            <h2>Lobby - Hola <span id="displayName"></span>!</h2>
+            
+            <div style="margin: 20px 0;">
+                <input type="text" id="roomName" placeholder="Nombre de la sala" maxlength="30"/>
+                <button onclick="createRoom()">🎯 Crear Sala Nueva</button>
+            </div>
+            
+            <div id="messages"></div>
+            
+            <h3>Salas Disponibles</h3>
+            <div id="roomsList">
+                <p style="color: #999;">Buscando salas...</p>
+            </div>
+        </div>
+        
+        <!-- SECCIÓN DE JUEGO -->
+        <div id="gameSection">
+            <h2>🎮 Sala: <span id="currentRoomName"></span></h2>
+            
+            <div id="gameStatus"></div>
+            
+            <div style="margin: 20px 0;">
+                <h3>Jugadores:</h3>
+                <div id="playersList"></div>
+            </div>
+            
+            <button onclick="leaveRoom()">🚪 Salir de la Sala</button>
+            
+            <div id="gameContent" style="margin-top: 20px; display: none;">
+                <h3>¡Partida en curso!</h3>
+                <p>Aquí irá el juego Columns...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let playerName = '';
+        let currentRoomId = null;
+        
+        // ========== FUNCIONES DE UI ==========
+        function showSection(sectionId) {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('lobbySection').style.display = 'none';
+            document.getElementById('gameSection').style.display = 'none';
+            document.getElementById(sectionId).style.display = 'block';
+        }
+        
+        function showMessage(message, type = 'error') {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            container.appendChild(div);
+            
+            setTimeout(() => div.remove(), 5000);
+        }
+        
+        function login() {
+            playerName = document.getElementById('playerName').value.trim();
+            
+            if (!playerName) {
+                alert('Por favor ingresa tu nombre');
+                return;
+            }
+            
+            document.getElementById('displayName').textContent = playerName;
+            showSection('lobbySection');
+            
+            // Solicitar lista de salas
+            socket.emit('requestRoomsList');
+        }
+        
+        function createRoom() {
+            const roomName = document.getElementById('roomName').value.trim();
+            
+            if (!roomName) {
+                showMessage('Por favor ingresa un nombre para la sala');
+                return;
+            }
+            
+            socket.emit('createRoom', { playerName, roomName });
+        }
+        
+        function joinRoom(roomId) {
+            socket.emit('joinRoom', { playerName, roomId });
+        }
+        
+        function leaveRoom() {
+            socket.emit('leaveRoom');
+        }
+        
+        // ========== SOCKET EVENTS ==========
+        socket.on('roomsList', (rooms) => {
+            const container = document.getElementById('roomsList');
+            container.innerHTML = '';
+            
+            if (rooms.length === 0) {
+                container.innerHTML = '<p style="color: #999;">No hay salas disponibles. ¡Crea una!</p>';
+                return;
+            }
+            
+            rooms.forEach(room => {
+                const div = document.createElement('div');
+                div.className = `room ${room.isFull ? 'full' : 'available'}`;
+                
+                div.innerHTML = `
+                    <div class="room-info">
+                        <div class="room-name">${room.roomName}</div>
+                        <div class="room-players">👥 ${room.playerCount}/${room.maxPlayers} jugadores</div>
+                    </div>
+                    <div class="status ${room.status}">${room.status === 'waiting' ? 'Esperando' : 'Jugando'}</div>
+                `;
+                
+                if (!room.isFull && room.status === 'waiting') {
+                    div.onclick = () => joinRoom(room.roomId);
+                }
+                
+                container.appendChild(div);
+            });
+        });
+        
+        socket.on('roomCreated', (data) => {
+            if (data.success) {
+                currentRoomId = data.roomId;
+                showSection('gameSection');
+                document.getElementById('currentRoomName').textContent = data.room.roomName;
+                updatePlayersDisplay(data.room.players);
+                document.getElementById('gameStatus').innerHTML = '<div class="success">✅ Sala creada. Esperando oponente...</div>';
+            }
+        });
+        
+        socket.on('roomJoined', (data) => {
+            if (data.success) {
+                currentRoomId = data.roomId;
+                showSection('gameSection');
+                document.getElementById('currentRoomName').textContent = data.room.roomName;
+                updatePlayersDisplay(data.room.players);
+                document.getElementById('gameStatus').innerHTML = '<div class="success">✅ Te uniste a la sala</div>';
+            }
+        });
+        
+        socket.on('playerJoined', (data) => {
+            showMessage(`${data.playerName} se unió a la sala`, 'success');
+            updatePlayersDisplay(data.room.players);
+        });
+        
+        socket.on('playerLeft', (data) => {
+            showMessage(`Un jugador abandonó la sala`, 'error');
+            updatePlayersDisplay(data.room.players);
+            document.getElementById('gameContent').style.display = 'none';
+        });
+        
+        socket.on('gameStart', (data) => {
+            document.getElementById('gameStatus').innerHTML = '<div class="success">🎮 ¡Partida iniciada!</div>';
+            document.getElementById('gameContent').style.display = 'block';
+            console.log('Estado del juego:', data.gameState);
+        });
+        
+        socket.on('leftRoom', (data) => {
+            if (data.success) {
+                currentRoomId = null;
+                showSection('lobbySection');
+                showMessage('Saliste de la sala', 'success');
+            }
+        });
+        
+        socket.on('error', (data) => {
+            showMessage(data.message);
+        });
+        
+        function updatePlayersDisplay(players) {
+            const container = document.getElementById('playersList');
+            container.innerHTML = '';
+            
+            players.forEach((player, index) => {
+                const div = document.createElement('div');
+                div.style.padding = '10px';
+                div.style.backgroundColor = '#f9f9f9';
+                div.style.margin = '5px 0';
+                div.style.borderRadius = '5px';
+                div.innerHTML = `<strong>Jugador ${index + 1}:</strong> ${player.name}`;
+                container.appendChild(div);
+            });
+        }
+        
+        // Manejar Enter en los inputs
+        document.getElementById('playerName').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+        
+        document.getElementById('roomName').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') createRoom();
+        });
+    </script>
+</body>
+</html>
