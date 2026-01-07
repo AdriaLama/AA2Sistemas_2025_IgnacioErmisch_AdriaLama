@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Columns Online - Lobby</title>
+    <title>Columns Online - Game</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -106,20 +106,55 @@
         #lobbySection, #gameSection {
             display: none;
         }
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+        }
+        
+        .controls-row {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            width: 80px;
+            height: 60px;
+            font-size: 24px;
+            background-color: #2196F3;
+        }
+        
+        .control-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .key-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎮 Columns Online</h1>
         
-        <!-- SECCIÓN DE LOGIN -->
         <div id="loginSection">
             <h2>Bienvenido</h2>
             <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="20"/>
             <button onclick="login()">Continuar</button>
         </div>
         
-        <!-- SECCIÓN DE LOBBY -->
         <div id="lobbySection">
             <h2>Lobby - Hola <span id="displayName"></span>!</h2>
             
@@ -136,7 +171,6 @@
             </div>
         </div>
         
-        <!-- SECCIÓN DE JUEGO -->
         <div id="gameSection">
             <h2>🎮 Sala: <span id="currentRoomName"></span></h2>
             
@@ -150,8 +184,28 @@
             <button onclick="leaveRoom()">🚪 Salir de la Sala</button>
             
             <div id="gameContent" style="margin-top: 20px; display: none;">
-                <h3>¡Partida en curso!</h3>
-                <p>Aquí irá el juego Columns...</p>
+                <h3>¡Controles del Juego!</h3>
+                <p style="text-align: center;">La visualización del juego está en Unity. Usa estos controles para jugar:</p>
+                
+                <div class="controls">
+                    <div class="controls-row">
+                        <button class="control-btn" onclick="sendControl('rotatePiece')">🔄</button>
+                    </div>
+                    <div class="controls-row">
+                        <button class="control-btn" onclick="sendControl('moveLeft')">⬅️</button>
+                        <button class="control-btn" onclick="sendControl('moveDown')">⬇️</button>
+                        <button class="control-btn" onclick="sendControl('moveRight')">➡️</button>
+                    </div>
+                    <div class="controls-row">
+                        <button class="control-btn" onclick="sendControl('drop')" style="width: 180px;">⏬ DROP</button>
+                    </div>
+                </div>
+                
+                <div class="key-hint" style="text-align: center;">
+                    <p><strong>Atajos de teclado:</strong></p>
+                    <p>Flecha Izquierda: ⬅️ | Flecha Derecha: ➡️ | Flecha Abajo: ⬇️</p>
+                    <p>Espacio: 🔄 Rotar | Enter: ⏬ Drop</p>
+                </div>
             </div>
         </div>
     </div>
@@ -161,8 +215,8 @@
         const socket = io();
         let playerName = '';
         let currentRoomId = null;
+        let isPlaying = false;
         
-        // ========== FUNCIONES DE UI ==========
         function showSection(sectionId) {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('lobbySection').style.display = 'none';
@@ -191,7 +245,6 @@
             document.getElementById('displayName').textContent = playerName;
             showSection('lobbySection');
             
-            // Solicitar lista de salas
             socket.emit('requestRoomsList');
         }
         
@@ -212,9 +265,41 @@
         
         function leaveRoom() {
             socket.emit('leaveRoom');
+            isPlaying = false;
         }
         
-        // ========== SOCKET EVENTS ==========
+        function sendControl(action) {
+            if (!isPlaying) return;
+            socket.emit(action);
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (!isPlaying) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    sendControl('moveLeft');
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    sendControl('moveRight');
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    sendControl('moveDown');
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    sendControl('rotatePiece');
+                    break;
+                case 'Enter':
+                    e.preventDefault();
+                    sendControl('drop');
+                    break;
+            }
+        });
+        
         socket.on('roomsList', (rooms) => {
             const container = document.getElementById('roomsList');
             container.innerHTML = '';
@@ -273,17 +358,31 @@
             showMessage(`Un jugador abandonó la sala`, 'error');
             updatePlayersDisplay(data.room.players);
             document.getElementById('gameContent').style.display = 'none';
+            isPlaying = false;
         });
         
         socket.on('gameStart', (data) => {
-            document.getElementById('gameStatus').innerHTML = '<div class="success">🎮 ¡Partida iniciada!</div>';
+            document.getElementById('gameStatus').innerHTML = '<div class="success">🎮 ¡Partida iniciada! Visualiza en Unity</div>';
             document.getElementById('gameContent').style.display = 'block';
-            console.log('Estado del juego:', data.gameState);
+            isPlaying = true;
+            console.log('Juego iniciado:', data);
+        });
+        
+        socket.on('gameOver', (data) => {
+            isPlaying = false;
+            document.getElementById('gameStatus').innerHTML = `
+                <div class="success">
+                    🏆 ¡Juego terminado!<br>
+                    Ganador: ${data.winner}<br>
+                    Puntuaciones: ${data.finalScores.map(s => `${s.name}: ${s.score}`).join(', ')}
+                </div>
+            `;
         });
         
         socket.on('leftRoom', (data) => {
             if (data.success) {
                 currentRoomId = null;
+                isPlaying = false;
                 showSection('lobbySection');
                 showMessage('Saliste de la sala', 'success');
             }
@@ -308,7 +407,6 @@
             });
         }
         
-        // Manejar Enter en los inputs
         document.getElementById('playerName').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') login();
         });

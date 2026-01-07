@@ -1,27 +1,16 @@
-//init
+
 const express = require("express");
 const app = express();
-
 require("./bddSetup");
-
-//Settings Section
 app.set("port", process.env.PORT || 3000);
 app.set("json spaces", 2);
-
-//Middlewares
 const morgan = require("morgan");
 app.use(morgan("dev"));
-
-//Express url work setup
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
-
 const path = require("path");
 app.use(express.static(path.join(__dirname, "../public")))
-
-//Auxiliar class
 const ipHelper = require("ip");
-
 const http = require("http");
 const server = http.createServer(app);
 
@@ -34,21 +23,19 @@ const io = new Server(server, {
 });
 app.set("io", io);
 
-// ========== GAME MANAGER ==========
 const GameManager = require('./aa4/GameManager.js');
 const gameManager = new GameManager();
+const ColumnsGame = require('./aa4/ColumnsGame.js');
+const activeGames = new Map(); 
 
-// ========== VARIABLES DE CHAT ==========
 var messageList = [];
 
-// ========== SOCKET.IO EVENTS ==========
 io.on("connection", (socket) => {
     console.log("Cliente conectado: " + socket.id);
     
     var address = socket.request.connection;
     console.log("Socket connected with ip:port --> " + address.remoteAddress + ":" + address.remotePort);
-    
-    // ========== EVENTOS DE CHAT ==========
+
     socket.on("ClientRequestMessageListToServer", () => {
         socket.emit("ServerResponseRequestMessageListToServer", messageList);
     });
@@ -90,12 +77,8 @@ io.on("connection", (socket) => {
         );
     });
     
-    // ========== EVENTOS DE SALAS DE JUEGO ==========
+    socket.emit("roomsList", gameManager.getAllRooms());
     
-    // Enviar lista de salas disponibles al conectar
-    socket.emit("roomsList", gameManager.getAvailableRooms());
-    
-    // CREAR SALA
     socket.on("createRoom", (data) => {
         console.log(`Solicitud crear sala de ${data.playerName}: ${data.roomName}`);
         
@@ -109,13 +92,11 @@ io.on("connection", (socket) => {
             room: room.toJSON()
         });
         
-        // Notificar a todos sobre la nueva sala
-        io.emit("roomsList", gameManager.getAvailableRooms());
+        io.emit("roomsList", gameManager.getAllRooms());
     });
-    
-    // UNIRSE A SALA
+     
     socket.on("joinRoom", (data) => {
-        console.log(`${data.playerName} intenta unirse a sala ${data.roomId}`);
+        console.log(` ${data.playerName} intenta unirse a sala ${data.roomId}`);
         
         const result = gameManager.joinRoom(data.roomId, socket.id, data.playerName);
         
@@ -127,7 +108,6 @@ io.on("connection", (socket) => {
         const room = gameManager.getRoom(data.roomId);
         socket.join(`room_${data.roomId}`);
         
-        // Notificar a todos en la sala
         io.to(`room_${data.roomId}`).emit("playerJoined", {
             playerName: data.playerName,
             room: room.toJSON()
@@ -139,60 +119,211 @@ io.on("connection", (socket) => {
             room: room.toJSON()
         });
         
-        // Si la sala está llena, iniciar el juego
         if (room.canStart()) {
-            const startResult = room.startGame();
-            
-            if (startResult.success) {
-                io.to(`room_${data.roomId}`).emit("gameStart", {
+            startGame(room);
+        }
+        
+        
+        io.emit("roomsList", gameManager.getAllRooms());
+    });
+    
+    socket.on("spectateRoom", (data) => {
+        console.log(` Espectador intenta unirse a sala ${data.roomId}`);
+        
+        const room = gameManager.getRoom(data.roomId);
+        
+        if (!room) {
+            socket.emit("error", { message: "Sala no encontrada" });
+            return;
+        }
+        
+        socket.join(`room_${data.roomId}`);
+        
+        socket.emit("spectatorJoined", {
+            success: true,
+            roomId: data.roomId
+        });
+        
+        const setupData = {
+            roomId: data.roomId,
+            players: room.players.map((player, index) => ({
+                playerId: index,
+                playerName: player.name,
+                socketId: player.socketId,
+                sizeX: 6,
+                sizeY: 12
+            }))
+        };
+        
+        socket.emit("gameSetup", setupData);
+        
+        if (room.status === 'playing') {
+            const game = activeGames.get(data.roomId);
+            if (game) {
+                socket.emit("gameStart", {
                     room: room.toJSON(),
                     gameState: room.getGameState()
                 });
+                
+                const currentStates = game.getAllStates();
+                socket.emit("gameUpdate", currentStates);
             }
         }
         
-        // Actualizar lista de salas
-        io.emit("roomsList", gameManager.getAvailableRooms());
+        console.log(` Espectador unido a sala ${data.roomId}`);
     });
     
-    // SALIR DE SALA
+    function startGame(room) {
+        const startResult = room.startGame();
+        
+        if (!startResult.success) return;
+        
+        console.log(` Iniciando juego en sala ${room.roomId}`);    
+        const game = new ColumnsGame(room.roomId);
+        
+        room.players.forEach(player => {
+            game.initializePlayer(player.socketId, player.name);
+        });
+        
+        activeGames.set(room.roomId, game);
+    
+        const setupData = {
+            roomId: room.roomId,
+            players: room.players.map((player, index) => ({
+                playerId: index,
+                playerName: player.name,
+                socketId: player.socketId,
+                sizeX: 6,
+                sizeY: 12
+            }))
+        };
+        
+        io.to(`room_${room.roomId}`).emit("gameSetup", setupData);
+        
+        
+        setTimeout(() => {
+            console.log(` Emitiendo gameStart para sala ${room.roomId}`);
+            
+            io.to(`room_${room.roomId}`).emit("gameStart", {
+                room: room.toJSON(),
+                gameState: room.getGameState()
+            });
+            
+            const initialStates = game.getAllStates();
+            io.to(`room_${room.roomId}`).emit("gameUpdate", initialStates);
+        
+            game.start(io, room.roomId);
+        }, 2000);
+    }
+         
+    socket.on("moveLeft", () => {
+        const room = gameManager.getRoomByPlayer(socket.id);
+        if (!room || room.status !== 'playing') return;
+        
+        const game = activeGames.get(room.roomId);
+        if (!game) return;
+        
+        game.moveLeft(socket.id);
+        
+        const states = game.getAllStates();
+        io.to(`room_${room.roomId}`).emit("gameUpdate", states);
+    });
+    
+    socket.on("moveRight", () => {
+        const room = gameManager.getRoomByPlayer(socket.id);
+        if (!room || room.status !== 'playing') return;
+        
+        const game = activeGames.get(room.roomId);
+        if (!game) return;
+        
+        game.moveRight(socket.id);
+        
+        const states = game.getAllStates();
+        io.to(`room_${room.roomId}`).emit("gameUpdate", states);
+    });
+    
+    socket.on("moveDown", () => {
+        const room = gameManager.getRoomByPlayer(socket.id);
+        if (!room || room.status !== 'playing') return;
+        
+        const game = activeGames.get(room.roomId);
+        if (!game) return;
+        
+        game.moveDown(socket.id);
+        
+        const states = game.getAllStates();
+        io.to(`room_${room.roomId}`).emit("gameUpdate", states);
+    });
+    
+    socket.on("rotatePiece", () => {
+        const room = gameManager.getRoomByPlayer(socket.id);
+        if (!room || room.status !== 'playing') return;
+        
+        const game = activeGames.get(room.roomId);
+        if (!game) return;
+        
+        game.rotatePiece(socket.id);
+        
+        const states = game.getAllStates();
+        io.to(`room_${room.roomId}`).emit("gameUpdate", states);
+    });
+    
+    socket.on("drop", () => {
+        const room = gameManager.getRoomByPlayer(socket.id);
+        if (!room || room.status !== 'playing') return;
+        
+        const game = activeGames.get(room.roomId);
+        if (!game) return;
+        
+        game.drop(socket.id);
+        
+        const states = game.getAllStates();
+        io.to(`room_${room.roomId}`).emit("gameUpdate", states);
+    });
+    
     socket.on("leaveRoom", () => {
         const result = gameManager.leaveRoom(socket.id);
         
         if (result.success && result.room) {
             socket.leave(`room_${result.room.roomId}`);
             
-            // Notificar a los demás
+            const game = activeGames.get(result.room.roomId);
+            if (game) {
+                game.stop();
+                activeGames.delete(result.room.roomId);
+            }
+            
             io.to(`room_${result.room.roomId}`).emit("playerLeft", {
                 room: result.room.toJSON()
             });
             
             socket.emit("leftRoom", { success: true });
-            
-            // Actualizar lista
-            io.emit("roomsList", gameManager.getAvailableRooms());
+            io.emit("roomsList", gameManager.getAllRooms());
         }
     });
     
-    // SOLICITAR LISTA DE SALAS
     socket.on("requestRoomsList", () => {
-        socket.emit("roomsList", gameManager.getAvailableRooms());
+        socket.emit("roomsList", gameManager.getAllRooms());
     });
     
-    // DESCONEXIÓN
     socket.on("disconnect", () => {
         console.log("Cliente desconectado: " + socket.id);
         
         const result = gameManager.leaveRoom(socket.id);
         
         if (result.success && result.room) {
-            // Notificar a los demás en la sala
+            
+            const game = activeGames.get(result.room.roomId);
+            if (game) {
+                game.stop();
+                activeGames.delete(result.room.roomId);
+            }
+                      
             io.to(`room_${result.room.roomId}`).emit("playerLeft", {
                 room: result.room.toJSON()
             });
             
-            // Actualizar lista de salas
-            io.emit("roomsList", gameManager.getAvailableRooms());
+            io.emit("roomsList", gameManager.getAllRooms());
         }
     });
 });
@@ -203,5 +334,5 @@ server.listen(app.get("port"), () => {
     const ip = ipHelper.address();
     const port = app.get("port");
     const url = "http://" + ip + ":" + port + "/";
-    console.log("Servidor arrancado en la url: " + url);
+    console.log(" Servidor arrancado en la url: " + url);
 });
