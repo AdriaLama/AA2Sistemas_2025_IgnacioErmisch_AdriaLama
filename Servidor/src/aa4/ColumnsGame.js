@@ -118,14 +118,21 @@ class ColumnsGame {
         const player = this.players[playerId];
         if (!player.isAlive || !player.currentPiece) return false;
         
+        const originalPiece = player.currentPiece;
+        
         const temp = player.currentPiece[2];
         player.currentPiece[2] = player.currentPiece[1];
         player.currentPiece[1] = player.currentPiece[0];
         player.currentPiece[0] = temp;
+  
+        if (!this.canPlacePiece(playerId, player.pieceX, player.pieceY)) {
+            player.currentPiece = originalPiece;
+            return false;
+        }
         
         return true;
     }
-
+    
     drop(playerId) {
         const player = this.players[playerId];
         if (!player.isAlive || !player.currentPiece) return false;
