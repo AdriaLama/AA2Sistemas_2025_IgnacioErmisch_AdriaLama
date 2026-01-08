@@ -13,10 +13,9 @@ public class SocketIO : MonoBehaviour
     public SocketIOUnity socket;
     public string serverUrlLink = "http://192.168.1.41:3000";
 
-    [Header("References")]
     public NodeGrid[] playerGrids;
+    public PlayerUIPanel[] playerUIPanels; // Nueva referencia
 
-    [Header("UI References")]
     public GameObject roomListPanel;
     public GameObject gameViewPanel;
     public Transform roomListContent;
@@ -141,11 +140,13 @@ public class SocketIO : MonoBehaviour
                         var p = players[i];
                         string socketId = p["socketId"]?.ToObject<string>() ?? "";
                         string playerName = p["playerName"]?.ToObject<string>() ?? "Unknown";
+                        int playerId = p["playerId"]?.ToObject<int>() ?? i;
                         int sizeX = p["sizeX"]?.ToObject<int>() ?? 6;
                         int sizeY = p["sizeY"]?.ToObject<int>() ?? 12;
 
                         socketIdToPlayerIndex[socketId] = i;
 
+                        // Activar y configurar el grid
                         if (playerGrids[i].gameObject != null)
                         {
                             playerGrids[i].gameObject.SetActive(true);
@@ -153,18 +154,31 @@ public class SocketIO : MonoBehaviour
 
                         playerGrids[i].SetupGrid(new NodeGrid.GridSetup
                         {
-                            playerId = p["playerId"]?.ToObject<int>() ?? i,
+                            playerId = playerId,
                             playerName = playerName,
                             sizeX = sizeX,
                             sizeY = sizeY
                         });
+
+                        // Inicializar UI Panel si existe
+                        if (playerUIPanels != null && i < playerUIPanels.Length && playerUIPanels[i] != null)
+                        {
+                            playerUIPanels[i].gameObject.SetActive(true);
+                            playerUIPanels[i].Initialize(playerId, playerName);
+                        }
                     }
 
+                    // Desactivar grids y panels no usados
                     for (int i = players.Count; i < playerGrids.Length; i++)
                     {
                         if (playerGrids[i].gameObject != null)
                         {
                             playerGrids[i].gameObject.SetActive(false);
+                        }
+
+                        if (playerUIPanels != null && i < playerUIPanels.Length && playerUIPanels[i] != null)
+                        {
+                            playerUIPanels[i].gameObject.SetActive(false);
                         }
                     }
 
@@ -240,6 +254,28 @@ public class SocketIO : MonoBehaviour
                         }
 
                         playerGrids[index].UpdateGrid(update);
+
+                        if (playerUIPanels != null && index < playerUIPanels.Length && playerUIPanels[index] != null)
+                        {
+                            int score = SafeParseInt(state["score"], 0);
+                            int level = SafeParseInt(state["level"], 1);
+                            bool isAlive = state["isAlive"]?.ToObject<bool>() ?? true;
+
+                            playerUIPanels[index].UpdateScore(score);
+                            playerUIPanels[index].UpdateLevel(level);
+
+                           
+                            var nextPieceArray = state["nextPiece"];
+                            if (nextPieceArray is JArray nextPiece && nextPiece.Count == 3)
+                            {
+                                int[] pieceData = new int[3];
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    pieceData[i] = SafeParseInt(nextPiece[i], 0);
+                                }
+                                playerUIPanels[index].UpdateNextPiece(pieceData);
+                            }
+                        }
                     }
                 }
                 catch { }
