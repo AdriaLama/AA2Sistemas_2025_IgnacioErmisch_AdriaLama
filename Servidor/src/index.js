@@ -317,6 +317,7 @@ bddConnection.on('connect', () => {
         const ip = ipHelper.address();
         const port = app.get("port");
         const url = "http://" + ip + ":" + port + "/";
+        console.log("Servidor arrancado en: " + url);
     });
 });
 
