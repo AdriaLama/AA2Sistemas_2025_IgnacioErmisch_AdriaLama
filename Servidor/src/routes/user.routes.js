@@ -4,6 +4,10 @@ const router = express.Router();
 router.post("/register", async (req, res) => {
     const { username, password } = req.body;
     
+    console.log("=== REGISTRO INICIADO ===");
+    console.log("Username:", username);
+    console.log("Password length:", password ? password.length : 0);
+    
     if (!username || !password) {
         return res.status(400).json({
             success: false,
@@ -27,35 +31,66 @@ router.post("/register", async (req, res) => {
     
     const bddConnection = req.app.get("bdd");
     
+    if (!bddConnection) {
+        console.error("ERROR: No hay conexión a la base de datos");
+        return res.status(500).json({
+            success: false,
+            message: "Error del servidor - No hay conexión a BD"
+        });
+    }
+    
     try {
         bddConnection.query(
             'SELECT COUNT(*) as count FROM User WHERE username = ?',
             [username],
             (err, results) => {
                 if (err) {
+                    console.error("ERROR en SELECT:", err);
+                    console.error("Error code:", err.code);
+                    console.error("Error message:", err.message);
+                    console.error("SQL State:", err.sqlState);
+                    
                     return res.status(500).json({
                         success: false,
-                        message: "Error del servidor"
+                        message: "Error del servidor al verificar usuario",
+                        error: err.message, 
+                        errorCode: err.code
                     });
                 }
                 
+                console.log("Resultado SELECT:", results);
+                
                 if (results[0].count > 0) {
+                    console.log("Usuario ya existe");
                     return res.status(400).json({
                         success: false,
                         message: "El usuario ya existe"
                     });
                 }
-                
+       
+                console.log("Intentando INSERT...");
                 bddConnection.query(
                     'INSERT INTO User (username, password) VALUES (?, ?)',
                     [username, password],
                     (err, result) => {
                         if (err) {
+                            console.error("ERROR en INSERT:", err);
+                            console.error("Error code:", err.code);
+                            console.error("Error message:", err.message);
+                            console.error("SQL State:", err.sqlState);
+                            console.error("SQL Message:", err.sqlMessage);
+                            
                             return res.status(500).json({
                                 success: false,
-                                message: "Error al crear el usuario"
+                                message: "Error al crear el usuario",
+                                error: err.message, 
+                                errorCode: err.code,
+                                sqlMessage: err.sqlMessage
                             });
                         }
+                        
+                        console.log("INSERT exitoso:", result);
+                        console.log("Insert ID:", result.insertId);
                         
                         res.status(201).json({
                             success: true,
@@ -67,15 +102,20 @@ router.post("/register", async (req, res) => {
             }
         );
     } catch (error) {
+        console.error("ERROR GENERAL:", error);
         res.status(500).json({
             success: false,
-            message: "Error del servidor"
+            message: "Error del servidor",
+            error: error.message
         });
     }
 });
 
 router.post("/login", async (req, res) => {
     const { username, password } = req.body;
+    
+    console.log("=== LOGIN INICIADO ===");
+    console.log("Username:", username);
     
     if (!username || !password) {
         return res.status(400).json({
@@ -92,11 +132,14 @@ router.post("/login", async (req, res) => {
             [username, password],
             (err, results) => {
                 if (err) {
+                    console.error("ERROR en LOGIN:", err);
                     return res.status(500).json({
                         success: false,
                         message: "Error del servidor"
                     });
                 }
+                
+                console.log("Resultados LOGIN:", results);
                 
                 if (results.length === 0) {
                     return res.status(401).json({
@@ -118,6 +161,7 @@ router.post("/login", async (req, res) => {
             }
         );
     } catch (error) {
+        console.error("ERROR GENERAL LOGIN:", error);
         res.status(500).json({
             success: false,
             message: "Error del servidor"
@@ -127,7 +171,6 @@ router.post("/login", async (req, res) => {
 
 router.get("/check/:username", async (req, res) => {
     const { username } = req.params;
-    
     const bddConnection = req.app.get("bdd");
     
     try {
@@ -158,7 +201,6 @@ router.get("/check/:username", async (req, res) => {
 
 router.get("/user/:id", async (req, res) => {
     const { id } = req.params;
-    
     const bddConnection = req.app.get("bdd");
     
     try {
