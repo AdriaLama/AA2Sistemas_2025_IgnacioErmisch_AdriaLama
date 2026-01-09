@@ -8,10 +8,14 @@ module.exports = function(app) {
         database: "mydb"
     });
     
+    app.set("bdd", connection);
+    
     connection.connect((error) => {
-        if(error) throw error;
+        if(error) {
+            console.error("❌ Error conectando a la base de datos:", error.message);
+            throw error;
+        }
         console.log("BDD Connected!");
-        app.set("bdd", connection);
     });
     
     return connection;

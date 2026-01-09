@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Columns Online - Autenticación</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #6b7fd7;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-width: 450px;
+            width: 100%;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 32px;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #999;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .tab.active {
+            color: #6b7fd7;
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #6b7fd7;
+        }
+        
+        .form-section {
+            display: none;
+        }
+        
+        .form-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #6b7fd7;
+            box-shadow: 0 0 0 3px rgba(107, 127, 215, 0.1);
+        }
+        
+        .input-group small {
+            display: block;
+            margin-top: 5px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        button[type="submit"] {
+            width: 100%;
+            padding: 14px;
+            background: #6b7fd7;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s;
+            margin-top: 10px;
+        }
+        
+        button[type="submit"]:hover {
+            background: #5a6ec7;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(107, 127, 215, 0.4);
+        }
+        
+        button[type="submit"]:active {
+            transform: translateY(0);
+        }
+        
+        button[type="submit"]:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.show {
+            display: block;
+        }
+        
+        .message.error {
+            background-color: #fee;
+            color: #c33;
+            border-left: 4px solid #c33;
+        }
+        
+        .message.success {
+            background-color: #efe;
+            color: #3c3;
+            border-left: 4px solid #3c3;
+        }
+        
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        button[type="submit"].loading .spinner {
+            display: block;
+        }
+        
+        button[type="submit"].loading .btn-text {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Columns Online</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('login')">Iniciar Sesión</button>
+            <button class="tab" onclick="showTab('register')">Registrarse</button>
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <div id="loginForm" class="form-section active">
+            <form onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label for="loginUsername">Usuario</label>
+                    <input 
+                        type="text" 
+                        id="loginUsername" 
+                        name="username"
+                        required 
+                        minlength="3"
+                        maxlength="45"
+                        placeholder="Ingresa tu usuario"
+                        autocomplete="username"
+                    />
+                </div>
+                
+                <div class="input-group">
+                    <label for="loginPassword">Contraseña</label>
+                    <input 
+                        type="password" 
+                        id="loginPassword" 
+                        name="password"
+                        required 
+                        minlength="4"
+                        maxlength="45"
+                        placeholder="Ingresa tu contraseña"
+                        autocomplete="current-password"
+                    />
+                </div>
+                
+                <button type="submit" id="loginBtn">
+                    <span class="btn-text">Iniciar Sesión</span>
+                    <div class="spinner"></div>
+                </button>
+            </form>
+        </div>
+        
+        <div id="registerForm" class="form-section">
+            <form onsubmit="handleRegister(event)">
+                <div class="input-group">
+                    <label for="registerUsername">Usuario</label>
+                    <input 
+                        type="text" 
+                        id="registerUsername" 
+                        name="username"
+                        required 
+                        minlength="3"
+                        maxlength="45"
+                        placeholder="Elige un nombre de usuario"
+                        autocomplete="username"
+                    />
+                    <small>Entre 3 y 45 caracteres</small>
+                </div>
+                
+                <div class="input-group">
+                    <label for="registerPassword">Contraseña</label>
+                    <input 
+                        type="password" 
+                        id="registerPassword" 
+                        name="password"
+                        required 
+                        minlength="4"
+                        maxlength="45"
+                        placeholder="Elige una contraseña segura"
+                        autocomplete="new-password"
+                    />
+                    <small>Mínimo 4 caracteres</small>
+                </div>
+                
+                <div class="input-group">
+                    <label for="registerPasswordConfirm">Confirmar Contraseña</label>
+                    <input 
+                        type="password" 
+                        id="registerPasswordConfirm" 
+                        name="passwordConfirm"
+                        required 
+                        minlength="4"
+                        maxlength="45"
+                        placeholder="Repite tu contraseña"
+                        autocomplete="new-password"
+                    />
+                </div>
+                
+                <button type="submit" id="registerBtn">
+                    <span class="btn-text">Crear Cuenta</span>
+                    <div class="spinner"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+            
+            if (tab === 'login') {
+                document.getElementById('loginForm').classList.add('active');
+            } else {
+                document.getElementById('registerForm').classList.add('active');
+            }
+            
+            hideMessage();
+        }
+        
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type} show`;
+        }
+        
+        function hideMessage() {
+            const messageEl = document.getElementById('message');
+            messageEl.classList.remove('show');
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginBtn');
+            
+            hideMessage();
+            btn.classList.add('loading');
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('userId', data.user.id);
+                    localStorage.setItem('username', data.user.username);
+                    
+                    showMessage('¡Login exitoso! Redirigiendo...', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/game.html';
+                    }, 1000);
+                } else {
+                    showMessage(data.message || 'Error en el login', 'error');
+                }
+            } catch (error) {
+                showMessage('Error de conexión con el servidor', 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+        
+        async function handleRegister(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('registerUsername').value.trim();
+            const password = document.getElementById('registerPassword').value;
+            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+            const btn = document.getElementById('registerBtn');
+            
+            hideMessage();
+            
+            if (password !== passwordConfirm) {
+                showMessage('Las contraseñas no coinciden', 'error');
+                return;
+            }
+            
+            btn.classList.add('loading');
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión', 'success');
+                    
+                    document.getElementById('registerUsername').value = '';
+                    document.getElementById('registerPassword').value = '';
+                    document.getElementById('registerPasswordConfirm').value = '';
+                    
+                    setTimeout(() => {
+                        document.querySelectorAll('.tab')[0].click();
+                        document.getElementById('loginUsername').value = username;
+                    }, 2000);
+                } else {
+                    showMessage(data.message || 'Error en el registro', 'error');
+                }
+            } catch (error) {
+                showMessage('Error de conexión con el servidor', 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            }
+        }
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            const userId = localStorage.getItem('userId');
+            const username = localStorage.getItem('username');
+            
+            if (userId && username) {
+                window.location.href = '/game.html';
+            }
+        });
+    </script>
+</body>
+</html>

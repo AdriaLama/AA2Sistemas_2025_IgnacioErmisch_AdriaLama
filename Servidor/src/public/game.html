@@ -18,7 +18,44 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        h1 { color: #333; text-align: center; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #4CAF50;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        
+        .logout-btn {
+            background-color: #f44336;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .logout-btn:hover {
+            background-color: #da190b;
+        }
+        
+        h1 { color: #333; text-align: center; margin: 0; }
         h2 { color: #666; border-bottom: 2px solid #4CAF50; padding-bottom: 10px; }
         
         input[type="text"] {
@@ -143,20 +180,63 @@
             color: #666;
             margin-top: 5px;
         }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
+    
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Verificando autenticación...</p>
+        </div>
+    </div>
+
     <div class="container">
-        <h1>🎮 Columns Online</h1>
-        
-        <div id="loginSection">
-            <h2>Bienvenido</h2>
-            <input type="text" id="playerName" placeholder="Ingresa tu nombre" maxlength="20"/>
-            <button onclick="login()">Continuar</button>
+        <div class="header">
+            <h1>🎮 Columns Online</h1>
+            <div class="user-info">
+                <div class="user-badge">👤 <span id="currentUsername"></span></div>
+                <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
+            </div>
         </div>
         
         <div id="lobbySection">
-            <h2>Lobby - Hola <span id="displayName"></span>!</h2>
+            <h2>Lobby - ¡Bienvenido!</h2>
             
             <div style="margin: 20px 0;">
                 <input type="text" id="roomName" placeholder="Nombre de la sala" maxlength="30"/>
@@ -197,14 +277,14 @@
                         <button class="control-btn" onclick="sendControl('moveRight')">➡️</button>
                     </div>
                     <div class="controls-row">
-                        <button class="control-btn" onclick="sendControl('drop')" style="width: 180px;">⏬ DROP</button>
+                        <button class="control-btn" onclick="sendControl('drop')" style="width: 180px;">⬇ DROP</button>
                     </div>
                 </div>
                 
                 <div class="key-hint" style="text-align: center;">
                     <p><strong>Atajos de teclado:</strong></p>
                     <p>Flecha Izquierda: ⬅️ | Flecha Derecha: ➡️ | Flecha Abajo: ⬇️</p>
-                    <p>Espacio: 🔄 Rotar | Enter: ⏬ Drop</p>
+                    <p>Espacio: 🔄 Rotar | Enter: ⬇ Drop</p>
                 </div>
             </div>
         </div>
@@ -212,13 +292,159 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
+        let socket;
         let playerName = '';
         let currentRoomId = null;
         let isPlaying = false;
+        let userId = null;
+        
+        window.addEventListener('DOMContentLoaded', async () => {
+            const storedUserId = localStorage.getItem('userId');
+            const storedUsername = localStorage.getItem('username');
+            
+            if (!storedUserId || !storedUsername) {
+
+                window.location.href = '/auth.html';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/user/${storedUserId}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    
+                    localStorage.removeItem('userId');
+                    localStorage.removeItem('username');
+                    window.location.href = '/auth.html';
+                    return;
+                }
+                
+                userId = storedUserId;
+                playerName = storedUsername;
+                document.getElementById('currentUsername').textContent = playerName;
+                document.getElementById('loadingOverlay').style.display = 'none';
+                showSection('lobbySection');
+                initializeSocket();
+                
+            } catch (error) {
+                console.error('Error verificando usuario:', error);
+                localStorage.removeItem('userId');
+                localStorage.removeItem('username');
+                window.location.href = '/auth.html';
+            }
+        });
+        
+        function initializeSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('Conectado al servidor');
+                socket.emit('requestRoomsList');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Desconectado del servidor');
+            });
+            
+            setupGameListeners();
+        }
+        
+        function setupGameListeners() {
+            socket.on('roomsList', (rooms) => {
+                const container = document.getElementById('roomsList');
+                container.innerHTML = '';
+                
+                if (rooms.length === 0) {
+                    container.innerHTML = '<p style="color: #999;">No hay salas disponibles. ¡Crea una!</p>';
+                    return;
+                }
+                
+                rooms.forEach(room => {
+                    const div = document.createElement('div');
+                    div.className = `room ${room.isFull ? 'full' : 'available'}`;
+                    
+                    div.innerHTML = `
+                        <div class="room-info">
+                            <div class="room-name">${room.roomName}</div>
+                            <div class="room-players">👥 ${room.playerCount}/${room.maxPlayers} jugadores</div>
+                        </div>
+                        <div class="status ${room.status}">${room.status === 'waiting' ? 'Esperando' : 'Jugando'}</div>
+                    `;
+                    
+                    if (!room.isFull && room.status === 'waiting') {
+                        div.onclick = () => joinRoom(room.roomId);
+                    }
+                    
+                    container.appendChild(div);
+                });
+            });
+            
+            socket.on('roomCreated', (data) => {
+                if (data.success) {
+                    currentRoomId = data.roomId;
+                    showSection('gameSection');
+                    document.getElementById('currentRoomName').textContent = data.room.roomName;
+                    updatePlayersDisplay(data.room.players);
+                    document.getElementById('gameStatus').innerHTML = '<div class="success">✅ Sala creada. Esperando oponente...</div>';
+                }
+            });
+            
+            socket.on('roomJoined', (data) => {
+                if (data.success) {
+                    currentRoomId = data.roomId;
+                    showSection('gameSection');
+                    document.getElementById('currentRoomName').textContent = data.room.roomName;
+                    updatePlayersDisplay(data.room.players);
+                    document.getElementById('gameStatus').innerHTML = '<div class="success">✅ Te uniste a la sala</div>';
+                }
+            });
+            
+            socket.on('playerJoined', (data) => {
+                showMessage(`${data.playerName} se unió a la sala`, 'success');
+                updatePlayersDisplay(data.room.players);
+            });
+            
+            socket.on('playerLeft', (data) => {
+                showMessage(`Un jugador abandonó la sala`, 'error');
+                updatePlayersDisplay(data.room.players);
+                document.getElementById('gameContent').style.display = 'none';
+                isPlaying = false;
+            });
+            
+            socket.on('gameStart', (data) => {
+                document.getElementById('gameStatus').innerHTML = '<div class="success">🎮 ¡Partida iniciada! Visualiza en Unity</div>';
+                document.getElementById('gameContent').style.display = 'block';
+                isPlaying = true;
+                console.log('Juego iniciado:', data);
+            });
+            
+            socket.on('gameOver', (data) => {
+                isPlaying = false;
+                document.getElementById('gameStatus').innerHTML = `
+                    <div class="success">
+                        🏆 ¡Juego terminado!<br>
+                        Ganador: ${data.winner}<br>
+                        Puntuaciones: ${data.finalScores.map(s => `${s.name}: ${s.score}`).join(', ')}
+                    </div>
+                `;
+            });
+            
+            socket.on('leftRoom', (data) => {
+                if (data.success) {
+                    currentRoomId = null;
+                    isPlaying = false;
+                    showSection('lobbySection');
+                    showMessage('Saliste de la sala', 'success');
+                }
+            });
+            
+            socket.on('error', (data) => {
+                showMessage(data.message);
+            });
+        }
         
         function showSection(sectionId) {
-            document.getElementById('loginSection').style.display = 'none';
             document.getElementById('lobbySection').style.display = 'none';
             document.getElementById('gameSection').style.display = 'none';
             document.getElementById(sectionId).style.display = 'block';
@@ -232,20 +458,6 @@
             container.appendChild(div);
             
             setTimeout(() => div.remove(), 5000);
-        }
-        
-        function login() {
-            playerName = document.getElementById('playerName').value.trim();
-            
-            if (!playerName) {
-                alert('Por favor ingresa tu nombre');
-                return;
-            }
-            
-            document.getElementById('displayName').textContent = playerName;
-            showSection('lobbySection');
-            
-            socket.emit('requestRoomsList');
         }
         
         function createRoom() {
@@ -273,6 +485,34 @@
             socket.emit(action);
         }
         
+        function logout() {
+            if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                
+                if (currentRoomId) {
+                    socket.emit('leaveRoom');
+                }
+                
+                localStorage.removeItem('userId');
+                localStorage.removeItem('username');
+                window.location.href = '/auth.html';
+            }
+        }
+        
+        function updatePlayersDisplay(players) {
+            const container = document.getElementById('playersList');
+            container.innerHTML = '';
+            
+            players.forEach((player, index) => {
+                const div = document.createElement('div');
+                div.style.padding = '10px';
+                div.style.backgroundColor = '#f9f9f9';
+                div.style.margin = '5px 0';
+                div.style.borderRadius = '5px';
+                div.innerHTML = `<strong>Jugador ${index + 1}:</strong> ${player.name}`;
+                container.appendChild(div);
+            });
+        }
+        
         document.addEventListener('keydown', (e) => {
             if (!isPlaying) return;
             
@@ -298,117 +538,6 @@
                     sendControl('drop');
                     break;
             }
-        });
-        
-        socket.on('roomsList', (rooms) => {
-            const container = document.getElementById('roomsList');
-            container.innerHTML = '';
-            
-            if (rooms.length === 0) {
-                container.innerHTML = '<p style="color: #999;">No hay salas disponibles. ¡Crea una!</p>';
-                return;
-            }
-            
-            rooms.forEach(room => {
-                const div = document.createElement('div');
-                div.className = `room ${room.isFull ? 'full' : 'available'}`;
-                
-                div.innerHTML = `
-                    <div class="room-info">
-                        <div class="room-name">${room.roomName}</div>
-                        <div class="room-players">👥 ${room.playerCount}/${room.maxPlayers} jugadores</div>
-                    </div>
-                    <div class="status ${room.status}">${room.status === 'waiting' ? 'Esperando' : 'Jugando'}</div>
-                `;
-                
-                if (!room.isFull && room.status === 'waiting') {
-                    div.onclick = () => joinRoom(room.roomId);
-                }
-                
-                container.appendChild(div);
-            });
-        });
-        
-        socket.on('roomCreated', (data) => {
-            if (data.success) {
-                currentRoomId = data.roomId;
-                showSection('gameSection');
-                document.getElementById('currentRoomName').textContent = data.room.roomName;
-                updatePlayersDisplay(data.room.players);
-                document.getElementById('gameStatus').innerHTML = '<div class="success">✅ Sala creada. Esperando oponente...</div>';
-            }
-        });
-        
-        socket.on('roomJoined', (data) => {
-            if (data.success) {
-                currentRoomId = data.roomId;
-                showSection('gameSection');
-                document.getElementById('currentRoomName').textContent = data.room.roomName;
-                updatePlayersDisplay(data.room.players);
-                document.getElementById('gameStatus').innerHTML = '<div class="success">✅ Te uniste a la sala</div>';
-            }
-        });
-        
-        socket.on('playerJoined', (data) => {
-            showMessage(`${data.playerName} se unió a la sala`, 'success');
-            updatePlayersDisplay(data.room.players);
-        });
-        
-        socket.on('playerLeft', (data) => {
-            showMessage(`Un jugador abandonó la sala`, 'error');
-            updatePlayersDisplay(data.room.players);
-            document.getElementById('gameContent').style.display = 'none';
-            isPlaying = false;
-        });
-        
-        socket.on('gameStart', (data) => {
-            document.getElementById('gameStatus').innerHTML = '<div class="success">🎮 ¡Partida iniciada! Visualiza en Unity</div>';
-            document.getElementById('gameContent').style.display = 'block';
-            isPlaying = true;
-            console.log('Juego iniciado:', data);
-        });
-        
-        socket.on('gameOver', (data) => {
-            isPlaying = false;
-            document.getElementById('gameStatus').innerHTML = `
-                <div class="success">
-                    🏆 ¡Juego terminado!<br>
-                    Ganador: ${data.winner}<br>
-                    Puntuaciones: ${data.finalScores.map(s => `${s.name}: ${s.score}`).join(', ')}
-                </div>
-            `;
-        });
-        
-        socket.on('leftRoom', (data) => {
-            if (data.success) {
-                currentRoomId = null;
-                isPlaying = false;
-                showSection('lobbySection');
-                showMessage('Saliste de la sala', 'success');
-            }
-        });
-        
-        socket.on('error', (data) => {
-            showMessage(data.message);
-        });
-        
-        function updatePlayersDisplay(players) {
-            const container = document.getElementById('playersList');
-            container.innerHTML = '';
-            
-            players.forEach((player, index) => {
-                const div = document.createElement('div');
-                div.style.padding = '10px';
-                div.style.backgroundColor = '#f9f9f9';
-                div.style.margin = '5px 0';
-                div.style.borderRadius = '5px';
-                div.innerHTML = `<strong>Jugador ${index + 1}:</strong> ${player.name}`;
-                container.appendChild(div);
-            });
-        }
-        
-        document.getElementById('playerName').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') login();
         });
         
         document.getElementById('roomName').addEventListener('keypress', (e) => {

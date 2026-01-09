@@ -1,7 +1,6 @@
-
 const express = require("express");
 const app = express();
-require("./bddSetup");
+
 app.set("port", process.env.PORT || 3000);
 app.set("json spaces", 2);
 const morgan = require("morgan");
@@ -9,7 +8,9 @@ app.use(morgan("dev"));
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 const path = require("path");
-app.use(express.static(path.join(__dirname, "../public")))
+
+app.use(express.static(path.join(__dirname, "./public")));
+
 const ipHelper = require("ip");
 const http = require("http");
 const server = http.createServer(app);
@@ -31,10 +32,7 @@ const activeGames = new Map();
 var messageList = [];
 
 io.on("connection", (socket) => {
-    console.log("Cliente conectado: " + socket.id);
-    
     var address = socket.request.connection;
-    console.log("Socket connected with ip:port --> " + address.remoteAddress + ":" + address.remotePort);
 
     socket.on("ClientRequestMessageListToServer", () => {
         socket.emit("ServerResponseRequestMessageListToServer", messageList);
@@ -55,14 +53,12 @@ io.on("connection", (socket) => {
                 var loginResponseData = {};
                 
                 if (err) {
-                    console.log(err);
                     loginResponseData.status = "error";
                     socket.emit("LoginResponse", loginResponseData);
                     return;
                 }
                 
                 if (result.length <= 0) {
-                    console.log("User or password Incorrect");
                     loginResponseData.status = "error";
                     loginResponseData.message = "User or password Incorrect";
                     socket.emit("LoginResponse", loginResponseData);
@@ -72,7 +68,6 @@ io.on("connection", (socket) => {
                 loginResponseData.status = "success";
                 loginResponseData.id = result[0].id;
                 socket.emit("LoginResponse", loginResponseData);
-                console.log(loginResponseData);
             }
         );
     });
@@ -80,8 +75,6 @@ io.on("connection", (socket) => {
     socket.emit("roomsList", gameManager.getAllRooms());
     
     socket.on("createRoom", (data) => {
-        console.log(`Solicitud crear sala de ${data.playerName}: ${data.roomName}`);
-        
         const room = gameManager.createRoom(socket.id, data.playerName, data.roomName);
         
         socket.join(`room_${room.roomId}`);
@@ -96,8 +89,6 @@ io.on("connection", (socket) => {
     });
      
     socket.on("joinRoom", (data) => {
-        console.log(` ${data.playerName} intenta unirse a sala ${data.roomId}`);
-        
         const result = gameManager.joinRoom(data.roomId, socket.id, data.playerName);
         
         if (!result.success) {
@@ -123,13 +114,10 @@ io.on("connection", (socket) => {
             startGame(room);
         }
         
-        
         io.emit("roomsList", gameManager.getAllRooms());
     });
     
     socket.on("spectateRoom", (data) => {
-        console.log(` Espectador intenta unirse a sala ${data.roomId}`);
-        
         const room = gameManager.getRoom(data.roomId);
         
         if (!room) {
@@ -169,8 +157,6 @@ io.on("connection", (socket) => {
                 socket.emit("gameUpdate", currentStates);
             }
         }
-        
-        console.log(` Espectador unido a sala ${data.roomId}`);
     });
     
     function startGame(room) {
@@ -178,7 +164,6 @@ io.on("connection", (socket) => {
         
         if (!startResult.success) return;
         
-        console.log(` Iniciando juego en sala ${room.roomId}`);    
         const game = new ColumnsGame(room.roomId);
         
         room.players.forEach(player => {
@@ -200,10 +185,7 @@ io.on("connection", (socket) => {
         
         io.to(`room_${room.roomId}`).emit("gameSetup", setupData);
         
-        
         setTimeout(() => {
-            console.log(` Emitiendo gameStart para sala ${room.roomId}`);
-            
             io.to(`room_${room.roomId}`).emit("gameStart", {
                 room: room.toJSON(),
                 gameState: room.getGameState()
@@ -307,12 +289,9 @@ io.on("connection", (socket) => {
     });
     
     socket.on("disconnect", () => {
-        console.log("Cliente desconectado: " + socket.id);
-        
         const result = gameManager.leaveRoom(socket.id);
         
         if (result.success && result.room) {
-            
             const game = activeGames.get(result.room.roomId);
             if (game) {
                 game.stop();
@@ -330,9 +309,18 @@ io.on("connection", (socket) => {
 
 app.use(require("./routes/_routes"));
 
-server.listen(app.get("port"), () => {
-    const ip = ipHelper.address();
-    const port = app.get("port");
-    const url = "http://" + ip + ":" + port + "/";
-    console.log(" Servidor arrancado en la url: " + url);
+const bddSetup = require("./bddSetup");
+const bddConnection = bddSetup(app);
+
+bddConnection.on('connect', () => {
+    server.listen(app.get("port"), () => {
+        const ip = ipHelper.address();
+        const port = app.get("port");
+        const url = "http://" + ip + ":" + port + "/";
+    });
+});
+
+bddConnection.on('error', (err) => {
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    }
 });
