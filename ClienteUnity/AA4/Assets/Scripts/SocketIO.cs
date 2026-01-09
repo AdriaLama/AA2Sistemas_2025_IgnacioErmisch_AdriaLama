@@ -415,14 +415,38 @@ public class SocketIO : MonoBehaviour
         socket.Emit("leaveRoom");
         currentRoomId = -1;
 
+        foreach (var grid in playerGrids)
+        {
+            if (grid != null && grid.gameObject != null)
+            {
+                grid.gameObject.SetActive(false);
+            }
+        }
+
+        if (playerUIPanels != null)
+        {
+            foreach (var panel in playerUIPanels)
+            {
+                if (panel != null && panel.gameObject != null)
+                {
+                    panel.gameObject.SetActive(false);
+                }
+            }
+        }
+
+      
+        socketIdToPlayerIndex.Clear();
+
+      
         if (roomListPanel) roomListPanel.SetActive(true);
         if (gameViewPanel) gameViewPanel.SetActive(false);
 
+     
         socket.Emit("requestRoomsList");
         UpdateStatus("Lobby");
     }
 
-    void UpdateStatus(string msg)
+        void UpdateStatus(string msg)
     {
         if (statusText) statusText.text = msg;
     }

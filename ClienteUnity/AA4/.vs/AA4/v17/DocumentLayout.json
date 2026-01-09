@@ -7,7 +7,7 @@
       "RelativeMoniker": "D:0:0:{C87B643B-9A4D-A5BC-A251-FB7067EDF4D5}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\socketio.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{C87B643B-9A4D-A5BC-A251-FB7067EDF4D5}|Assembly-CSharp.csproj|c:\\users\\adrii\\source\\repos\\aa2sistemas_2025_ignacioermisch_adrialama\\clienteunity\\aa4\\assets\\scripts\\playeruipanel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{C87B643B-9A4D-A5BC-A251-FB7067EDF4D5}|Assembly-CSharp.csproj|C:\\Users\\Adrii\\source\\repos\\AA2Sistemas_2025_IgnacioErmisch_AdriaLama\\ClienteUnity\\AA4\\assets\\scripts\\playeruipanel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{C87B643B-9A4D-A5BC-A251-FB7067EDF4D5}|Assembly-CSharp.csproj|solutionrelative:assets\\scripts\\playeruipanel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
@@ -34,8 +34,7 @@
               "RelativeToolTip": "Assets\\Scripts\\PlayerUIPanel.cs",
               "ViewState": "AgIAABoAAAAAAAAAAAAQwCIAAAAXAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-01-08T10:29:56.858Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-01-08T10:29:56.858Z"
             },
             {
               "$type": "Document",
@@ -45,7 +44,7 @@
               "RelativeDocumentMoniker": "Assets\\Scripts\\SocketIO.cs",
               "ToolTip": "C:\\Users\\Adrii\\source\\repos\\AA2Sistemas_2025_IgnacioErmisch_AdriaLama\\ClienteUnity\\AA4\\Assets\\Scripts\\SocketIO.cs",
               "RelativeToolTip": "Assets\\Scripts\\SocketIO.cs",
-              "ViewState": "AgIAAD0AAAAAAAAAAAAgwFMAAABFAAAAAAAAAA==",
+              "ViewState": "AgIAAJUBAAAAAAAAAAAuwKgBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-01-03T15:44:50.725Z",
               "EditorCaption": ""
